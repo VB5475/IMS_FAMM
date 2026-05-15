@@ -1,0 +1,128 @@
+/* App.css — Root layout */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #eef2f6;
+  color: #0f172a;
+  min-height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 16px;
+  gap: 12px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.app-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.app-meta strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Empty grid placeholder (before first search) ──────────────── */
+
+.app-empty-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #94a3b8;
+}
+
+.app-empty-grid svg {
+  opacity: 0.4;
+}
+
+.app-empty-grid p {
+  font-size: 0.9375rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.app-empty-grid strong {
+  color: #6366f1;
+}
+
+/* ── Searching overlay ─────────────────────────────────────────── */
+
+.app-searching {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.app-searching-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: app-spin 0.6s linear infinite;
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Search error ──────────────────────────────────────────────── */
+
+.app-search-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.app-search-error svg {
+  flex-shrink: 0;
+}
+

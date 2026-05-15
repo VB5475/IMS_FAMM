@@ -1,0 +1,233 @@
+// useGridSearch.js — Custom hook for the Search button data pipeline
+// ─────────────────────────────────────────────────────────────────────
+// Orchestrates: GET_MASTER_DETAIL → GET_DETAIL_COL_DATA →
+// GET_FILTER_DETAIL(cboMode="C") → GET_PARAMETERS → proc string →
+// GET_MASTER_DATA_FILL → { columns, rows }
+
+import { useState, useCallback } from 'react';
+import { apiClient } from '../api/useApi';
+import {
+  ENDPOINTS,
+  CBO_MODE,
+  STORAGE_KEYS,
+  DEFAULT_MASTER_ID,
+  DEFAULT_LOGIN_ID,
+  DEFAULT_COMPANY_ID,
+  DEFAULT_YEAR_ID,
+  DEFAULT_SESSION_ID,
+} from '../api/constants';
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Derive GridForm filterType from ColCtrlType.
+ * 0 (Label) → 'text', 1 (TextBox) → 'text', 2 (Date) → 'date',
+ * 4 (Dropdown) → 'select', 9 (Textarea) → 'text'
+ */
+function deriveFilterType(ctrlType) {
+  switch (ctrlType) {
+    case 2: return 'date';
+    case 4: return 'select';
+    default: return 'text';
+  }
+}
+
+/**
+ * Estimate a reasonable column width from the display name length.
+ */
+function estimateWidth(displayName) {
+  const len = (displayName || '').length;
+  if (len <= 4) return 80;
+  if (len <= 8) return 110;
+  if (len <= 14) return 150;
+  if (len <= 20) return 180;
+  return 220;
+}
+
+/**
+ * Format a filter value for the procedure call string.
+ * - Dates → 'yyyy-mm-dd'
+ * - Strings → 'value'  (single-quoted)
+ * - Numbers → raw number
+ */
+function formatParamValue(value, dataType) {
+  const dt = (dataType || '').toLowerCase();
+  const isNumeric = ['numeric', 'int', 'bigint', 'smallint', 'tinyint', 'decimal', 'float', 'bit'].includes(dt);
+
+  if (!isNumeric) {
+    // Assume string/varchar for anything non-numeric
+    return `'${value ?? ''}'`;
+  }
+
+  return value != null && value !== '' ? String(value) : '0';
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────
+
+export function useGridSearch() {
+  const [columns, setColumns] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // ── 1. Fetch & store master detail ──────────────────────────────
+  const fetchMasterDetail = useCallback(async (masterID = DEFAULT_MASTER_ID) => {
+    try {
+      const data = await apiClient.get(ENDPOINTS.GET_MASTER_DETAIL, {
+        params: { prmMasterID: masterID },
+      });
+      const detail = data?.Links?.[0] || null;
+      if (detail) {
+        localStorage.setItem(STORAGE_KEYS.MASTER_DETAIL, JSON.stringify(detail));
+        console.log('%c[MasterDetail] Stored:', 'color:#6366f1;font-weight:600', detail);
+      }
+      return detail;
+    } catch (err) {
+      console.error('[MasterDetail] Failed to fetch:', err);
+      return null;
+    }
+  }, []);
+
+  // ── 2. Main search pipeline ─────────────────────────────────────
+  const handleSearch = useCallback(async (filterValues, filterDefs, masterID = DEFAULT_MASTER_ID) => {
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      // ── Step A: Get column definitions ────────────────────────
+      const colData = await apiClient.get(ENDPOINTS.GET_DETAIL_COL_DATA, {
+        params: { prmMasterID: masterID },
+      });
+      const apiColumns = colData?.Links || [];
+      console.log('%c[Search] Columns:', 'color:#6366f1;font-weight:600', apiColumns.length);
+
+      // ── Step B: Fetch dropdown options for ColCtrlType=4 ──────
+      const dropdownCols = apiColumns.filter((c) => c.ColCtrlType === 4);
+      const colDropdownOptions = {};
+
+      if (dropdownCols.length > 0) {
+        // Get master detail for funcCode & divisionID
+        const storedDetail = JSON.parse(
+          localStorage.getItem(STORAGE_KEYS.MASTER_DETAIL) || '{}'
+        );
+
+        await Promise.all(
+          dropdownCols.map(async (col) => {
+            try {
+              const detailData = await apiClient.get(ENDPOINTS.GET_FILTER_DETAIL, {
+                params: {
+                  prmMasterID: masterID,
+                  prmFilterParameterName: col.IDNumber,
+                  prmCboMode: CBO_MODE.COLUMN,
+                  prmFuncCode: storedDetail.FuncCode || '',
+                  prmDivisionID: filterValues?.DivisionID || 0,
+                  prmLoginID: DEFAULT_LOGIN_ID,
+                },
+              });
+              colDropdownOptions[col.ColName] = (detailData?.Links || []).map(
+                (opt) => ({ value: String(opt.IDNumber), label: opt.Name })
+              );
+            } catch {
+              console.warn(`[Search] Failed dropdown for column: ${col.DisplayName}`);
+              colDropdownOptions[col.ColName] = [];
+            }
+          })
+        );
+      }
+
+      // ── Step C: Transform columns to GridForm format ──────────
+      const gridColumns = apiColumns.map((col, index) => ({
+        id: col.ColName,
+        name: col.DisplayName,
+        key: col.ColName,
+        controlType: col.ColCtrlType,
+        width: estimateWidth(col.DisplayName),
+        filterable: true,
+        filterType: deriveFilterType(col.ColCtrlType),
+        isFixed: index === 0, // first column fixed
+        dropdownOptions: colDropdownOptions[col.ColName] || [],
+      }));
+
+      setColumns(gridColumns);
+      console.log('%c[Search] Grid columns built:', 'color:#22c55e;font-weight:600', gridColumns.length);
+
+      // ── Step D: Get procedure parameters ──────────────────────
+      const masterDetail = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.MASTER_DETAIL) || '{}'
+      );
+      const queryName = masterDetail.QueryName || '';
+
+      if (!queryName) {
+        throw new Error('No QueryName found in master detail. Please reload the page.');
+      }
+
+      const paramData = await apiClient.get(ENDPOINTS.GET_PARAMETERS, {
+        params: { prmProcedure: queryName },
+      });
+      const paramList = paramData?.Links || [];
+      console.log('%c[Search] Parameters:', 'color:#6366f1;font-weight:600', paramList.length);
+
+      // ── Step E: Build procedure call string ───────────────────
+      // Match each parameter with filter definitions, use filter value or default
+      const paramValues = paramList.map((param) => {
+        const paramName = param.PARAMETER_NAME; // e.g. "@prmDivisionID"
+        const dataType = param.DATA_TYPE;       // e.g. "numeric" or "varchar"
+
+        // Find matching filter definition
+        const matchingFilter = (filterDefs || []).find(
+          (f) => f.FilterParameterName === paramName
+        );
+
+        if (matchingFilter) {
+          // Use the current filter value
+          const rawValue = filterValues[matchingFilter.FilterColName];
+          return formatParamValue(rawValue, dataType);
+        }
+
+        // No match — use default based on data type
+        const dt = (dataType || '').toLowerCase();
+        const isNumeric = ['numeric', 'int', 'bigint', 'smallint', 'tinyint', 'decimal', 'float', 'bit'].includes(dt);
+        if (isNumeric) return '0';
+        return "''";
+      });
+
+      // Join without spaces: pr_RB_MktActionEntry 0,0,0,0,'','','','','',1
+      const procString = `${queryName} ${paramValues.join(',')}`;
+      console.log('%c[Search] Proc string:', 'color:#f59e0b;font-weight:600', procString);
+
+      // ── Step F: Fetch grid data ───────────────────────────────
+      const rowData = await apiClient.get(ENDPOINTS.GET_MASTER_DATA_FILL, {
+        // params: { prmProcedure: procString },
+        params: { prmProcedure: "pr_RB_MktActionEntry 1, 13, 1, 88, '', '', '', '', '', 1" },
+      });
+      const apiRows = (rowData?.Links || []).map((row, idx) => ({
+        ...row,
+        id: row.IDNumber ?? row.id ?? idx + 1,
+      }));
+
+      setRows(apiRows);
+      setHasSearched(true);
+      console.log(
+        '%c[Search] Data loaded:',
+        'color:#22c55e;font-weight:600',
+        `${apiRows.length} rows, ${gridColumns.length} columns`
+      );
+    } catch (err) {
+      console.error('[Search] Pipeline failed:', err);
+      setSearchError(err?.message || 'Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  return {
+    columns,
+    rows,
+    isSearching,
+    searchError,
+    hasSearched,
+    fetchMasterDetail,
+    handleSearch,
+  };
+}

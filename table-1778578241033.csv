@@ -1,0 +1,7 @@
+﻿File,Description
+[GridForm.jsx](sandbox:///mnt/agents/output/erp-grid/GridForm.jsx),"Main component — all logic, rendering, keyboard handling"
+[GridForm.css](sandbox:///mnt/agents/output/erp-grid/GridForm.css),"Pure CSS — modern business app styling, no frameworks"
+[dummyData.js](sandbox:///mnt/agents/output/erp-grid/dummyData.js),Backend simulation — columns config + 25 rows of realistic ERP data
+[App.jsx](sandbox:///mnt/agents/output/erp-grid/App.jsx),Usage example
+[App.css](sandbox:///mnt/agents/output/erp-grid/App.css),Root layout
+[README.md](sandbox:///mnt/agents/output/erp-grid/README.md),Full integration guide
