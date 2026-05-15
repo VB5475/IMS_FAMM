@@ -161,6 +161,30 @@
   background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
 }
 
+/* ===== RESIZE HANDLE ===== */
+.resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 40;
+}
+
+.resize-handle:hover,
+.erp-grid-container.resizing .resize-handle {
+  background: var(--accent);
+}
+
+.erp-grid-container.resizing,
+.erp-grid-container.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 /* ===== FILTER ROW ===== */
 .filter-row td {
   position: sticky;
@@ -201,7 +225,8 @@
   border-right: 1px solid var(--border);
   background: var(--surface);
   transition: background var(--transition);
-  vertical-align: middle;
+  vertical-align: top;
+  height: auto;
 }
 
 .erp-table tbody td:last-child { border-right: none; }
@@ -243,8 +268,7 @@
 }
 
 .cell-input,
-.cell-select,
-.cell-textarea {
+.cell-select {
   width: 100%;
   padding: 5px 8px;
   border: 1px solid transparent;
@@ -258,15 +282,13 @@
 }
 
 .cell-input:hover,
-.cell-select:hover,
-.cell-textarea:hover {
+.cell-select:hover {
   border-color: var(--border-dark);
   background: var(--surface);
 }
 
 .cell-input:focus,
-.cell-select:focus,
-.cell-textarea:focus {
+.cell-select:focus {
   outline: none;
   border-color: var(--accent);
   background: var(--surface);
@@ -282,9 +304,40 @@
   padding-right: 22px;
 }
 
+/* ===== TEXTAREA WRAPPING ===== */
 .cell-textarea {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  transition: all var(--transition);
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
   min-height: 28px;
+  height: auto;
   line-height: 1.4;
+}
+
+.cell-textarea:hover {
+  border-color: var(--border-dark);
+  background: var(--surface);
+}
+
+.cell-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Ensure table rows expand for tall textareas */
+.erp-table tbody tr {
+  height: auto;
 }
 
 /* Checkbox cell */
@@ -469,6 +522,42 @@
 }
 
 .popup-btn.primary:hover { background: var(--primary-hover); }
+
+/* ===== DATE RANGE POPUP ===== */
+.popup-date-range {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popup-date-range .date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popup-date-range .date-field label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.popup-date-range .date-field input[type="date"] {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.popup-date-range .date-field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
 
 /* ===== CUSTOM FILTER PANEL ===== */
 .custom-filter-panel {

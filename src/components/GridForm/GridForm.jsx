@@ -74,11 +74,29 @@ function downloadCSV(filename, csvContent) {
   document.body.removeChild(link);
 }
 
-// Helper: parse a width value to a number (strips 'px' if string)
 function toPixels(w) {
   if (typeof w === 'number') return w;
   if (typeof w === 'string') return parseInt(w, 10) || 0;
   return 0;
+}
+
+// ─── Date Helpers ─────────────────────────────────────────────────────────
+function formatDateForInput(isoString) {
+  if (!isoString) return '';
+  // Handle "2026-05-25T00:00:00" → "2026-05-25"
+  if (typeof isoString === 'string' && isoString.includes('T')) {
+    return isoString.split('T')[0];
+  }
+  // Handle Date objects or other formats
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
+}
+
+function parseDateFromInput(dateString) {
+  if (!dateString) return '';
+  // Return as "2026-05-25T00:00:00" to preserve backend format
+  return `${dateString}T00:00:00`;
 }
 
 export default function GridForm({ config, initialData, title = 'Grid Form' }) {
@@ -97,35 +115,78 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
   const [activeFilterCol, setActiveFilterCol] = useState(null);
   const [filterSearch, setFilterSearch] = useState('');
   const [scrollState, setScrollState] = useState({ left: false, right: false });
+  const [columnWidths, setColumnWidths] = useState(() => {
+    const map = {};
+    columns.forEach(c => { map[c.id] = c.width; });
+    return map;
+  });
+  const [resizing, setResizing] = useState(null);
 
   const tableWrapperRef = useRef(null);
   const popupRef = useRef(null);
 
-  // Sync internal rows state when initialData changes (e.g. from API search results)
   useEffect(() => {
     setRows(initialData || []);
     setPage(1);
     setSelectedIds(new Set());
   }, [initialData]);
 
-  // ─── FIX 1: Compute cumulative left offset for each fixed column ──────────
-  // Uses toPixels() so both number (42) and string ("42px") widths work.
+  // ─── Column Resize Logic ─────────────────────────────────────────────────
+  const handleResizeStart = useCallback((e, colId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startWidth = toPixels(columnWidths[colId] || columns.find(c => c.id === colId)?.width || 120);
+    setResizing({ colId, startX: e.clientX, startWidth });
+  }, [columnWidths, columns]);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const handleMove = (e) => {
+      const diff = e.clientX - resizing.startX;
+      const newWidth = Math.max(60, resizing.startWidth + diff);
+      setColumnWidths(prev => ({ ...prev, [resizing.colId]: newWidth }));
+    };
+    const handleUp = () => setResizing(null);
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [resizing]);
+
+  // ─── Fixed column left offsets (recalculates on resize) ───────────────────
   const fixedLeftMap = useMemo(() => {
     const map = {};
     let left = 0;
     columns.forEach(col => {
       if (col.isFixed) {
-        map[col.id] = left;              // left offset BEFORE this column
-        left += toPixels(col.width) || 120;
+        map[col.id] = left;
+        left += toPixels(columnWidths[col.id] || col.width) || 120;
       }
     });
     return map;
-  }, [columns]);
+  }, [columns, columnWidths]);
 
   const lastFixedColId = useMemo(() => {
     const fixed = columns.filter(c => c.isFixed);
     return fixed.length > 0 ? fixed[fixed.length - 1].id : null;
   }, [columns]);
+
+  // ─── Helper: map raw dropdown value to its display label ─────────────────
+  const getDropdownLabel = useCallback((col, rawValue) => {
+    if (col.controlType !== 4 || !col.dropdownOptions) return rawValue;
+    const opts = col.dropdownOptions.map(opt => {
+      if (typeof opt === 'string') return { value: opt, label: opt };
+      if (opt && typeof opt === 'object') {
+        if (opt.value !== undefined) return { value: String(opt.value), label: opt.label || String(opt.value) };
+        return { value: String(opt.IDNumber ?? opt), label: opt.Name ?? String(opt) };
+      }
+      return { value: String(opt), label: String(opt) };
+    });
+    const found = opts.find(o => String(o.value) === String(rawValue));
+    return found ? found.label : rawValue;
+  }, []);
 
   const processedRows = useMemo(() => {
     let data = [...rows];
@@ -134,9 +195,30 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
       const lower = text.toLowerCase();
       data = data.filter(r => String(r[key] ?? '').toLowerCase().includes(lower));
     });
-    Object.entries(columnFilters).forEach(([key, allowedSet]) => {
-      if (!allowedSet || allowedSet.size === 0) return;
-      data = data.filter(r => allowedSet.has(String(r[key] ?? '')));
+    Object.entries(columnFilters).forEach(([key, filter]) => {
+      if (!filter) return;
+      if (filter instanceof Set) {
+        if (filter.size === 0) return;
+        data = data.filter(r => filter.has(String(r[key] ?? '')));
+      } else if (filter.type === 'range') {
+        const { from, to } = filter;
+        if (!from && !to) return;
+        data = data.filter(r => {
+          const val = r[key];
+          if (val == null || val === '') return false;
+          // Normalize ISO dates for comparison
+          const dateStr = typeof val === 'string' && val.includes('T') ? val.split('T')[0] : val;
+          const dateVal = new Date(dateStr);
+          if (isNaN(dateVal)) return false;
+          if (from && dateVal < new Date(from)) return false;
+          if (to) {
+            const endOfDay = new Date(to);
+            endOfDay.setHours(23, 59, 59, 999);
+            if (dateVal > endOfDay) return false;
+          }
+          return true;
+        });
+      }
     });
     customFilters.forEach(cf => {
       if (!cf.column) return;
@@ -179,7 +261,6 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
     }
   }, [activeFilterCol]);
 
-  // ─── FIX 2: Normalize IDs to strings so Set lookups work for numeric ids ──
   const handleSelectAll = useCallback(() => {
     const pageIds = displayRows.map(r => String(r.id));
     if (pageIds.length > 0 && pageIds.every(id => selectedIds.has(id))) {
@@ -302,9 +383,19 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
     switch (col.controlType) {
       case 0: return <span className="cell-label" title={value}>{value}</span>;
       case 1: return <input type="text" {...commonProps} />;
-      case 2: return <input type="date" {...commonProps} />;
+      case 2: {
+        // Date: convert ISO "2026-05-25T00:00:00" → "2026-05-25" for input
+        const dateValue = formatDateForInput(value);
+        return (
+          <input
+            type="date"
+            {...commonProps}
+            value={dateValue}
+            onChange={(e) => handleCellChange(row.id, col.key, parseDateFromInput(e.target.value))}
+          />
+        );
+      }
       case 4: {
-        // Support both API format [{ value, label }] and legacy string[] format
         const opts = (col.dropdownOptions || []).map(opt => {
           if (typeof opt === 'string') return { value: opt, label: opt };
           if (opt.value !== undefined) return opt;
@@ -321,7 +412,18 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
           />
         );
       }
-      case 9: return <textarea {...commonProps} rows={1} onFocus={(e) => { e.target.rows = 3; }} onBlur={(e) => { e.target.rows = 1; }} />;
+      case 9: {
+        const text = String(value ?? '');
+        const lineCount = (text.match(/\n/g) || []).length + 1;
+        const rows = Math.max(1, Math.min(lineCount, 6));
+        return (
+          <textarea
+            {...commonProps}
+            rows={rows}
+            style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', resize: 'none' }}
+          />
+        );
+      }
       default: return <span className="cell-label">{value}</span>;
     }
   };
@@ -332,24 +434,23 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
   };
 
   const isColFiltered = (colKey) => {
-    return columnFilters[colKey] && columnFilters[colKey].size > 0;
+    const filter = columnFilters[colKey];
+    if (!filter) return false;
+    if (filter instanceof Set) return filter.size > 0;
+    if (typeof filter === 'object' && filter.type === 'range') {
+      return !!(filter.from || filter.to);
+    }
+    return false;
   };
 
-  // ─── FIX 3: cellStyle — explicit px units + correct zIndex per row type ───
-  // thead CSS already sets z-index: 30 for fixed headers via .fixed-col rule,
-  // but inline styles take precedence, so we set the right values here too.
   const cellStyle = (col, rowType = 'body') => {
-    const w = `${toPixels(col.width) || 120}px`;
+    const w = `${toPixels(columnWidths[col.id] || col.width) || 120}px`;
     const base = { width: w, minWidth: w, maxWidth: w };
 
     if (col.isFixed) {
       base.position = 'sticky';
       base.left = `${fixedLeftMap[col.id]}px`;
 
-      // z-index ladder:
-      //  thead header row  → 30
-      //  thead filter row  → 25
-      //  tbody rows        → 10
       if (rowType === 'header') base.zIndex = 30;
       else if (rowType === 'filter') base.zIndex = 25;
       else base.zIndex = 10;
@@ -365,8 +466,10 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
     return classes.join(' ') || undefined;
   };
 
+  const isDateColumn = (col) => col.controlType === 2 || col.filterType === 'date';
+
   return (
-    <div className="erp-grid-container">
+    <div className={`erp-grid-container ${resizing ? 'resizing' : ''}`}>
       <div className="grid-toolbar">
         <div className="grid-toolbar-left">
           <h2 className="grid-title">{title}</h2>
@@ -507,51 +610,88 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
                     {activeFilterCol === col.key && (
                       <div className="column-filter-popup" ref={popupRef}>
                         <div className="popup-header">Filter: {col.name}</div>
-                        <div className="popup-search">
-                          <input type="text" placeholder="Search..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
-                        </div>
-                        <div className="popup-list">
-                          {(() => {
-                            const allValues = getUniqueValues(col.key);
-                            const filtered = filterSearch ? allValues.filter(v => v.toLowerCase().includes(filterSearch.toLowerCase())) : allValues;
-                            const currentSet = columnFilters[col.key] || new Set();
-                            const allSelected = filtered.length > 0 && filtered.every(v => currentSet.has(v));
-                            return (
-                              <>
-                                <div className="popup-item" onClick={() => {
-                                  const newSet = new Set(currentSet);
-                                  if (allSelected) { filtered.forEach(v => newSet.delete(v)); }
-                                  else { filtered.forEach(v => newSet.add(v)); }
-                                  applyColumnFilter(col.key, newSet);
-                                }}>
-                                  <input type="checkbox" checked={allSelected} readOnly />
-                                  <label>(Select All)</label>
-                                </div>
-                                {filtered.map(val => (
-                                  <div key={val} className="popup-item" onClick={() => {
-                                    const newSet = new Set(currentSet);
-                                    if (newSet.has(val)) newSet.delete(val);
-                                    else newSet.add(val);
-                                    applyColumnFilter(col.key, newSet);
-                                  }}>
-                                    <input type="checkbox" checked={currentSet.has(val)} readOnly />
-                                    <label title={val}>{val}</label>
-                                  </div>
-                                ))}
-                                {filtered.length === 0 && (
-                                  <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>No values found</div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                        <div className="popup-footer">
-                          <button className="popup-btn" onClick={() => clearColumnFilter(col.key)}>Clear</button>
-                          <button className="popup-btn primary" onClick={() => setActiveFilterCol(null)}>Close</button>
-                        </div>
+
+                        {isDateColumn(col) ? (
+                          <div className="popup-date-range">
+                            <div className="date-field">
+                              <label>From</label>
+                              <input
+                                type="date"
+                                value={columnFilters[col.key]?.from || ''}
+                                onChange={e => {
+                                  const current = columnFilters[col.key] || { type: 'range', from: '', to: '' };
+                                  setColumnFilters(prev => ({ ...prev, [col.key]: { ...current, from: e.target.value } }));
+                                }}
+                              />
+                            </div>
+                            <div className="date-field">
+                              <label>To</label>
+                              <input
+                                type="date"
+                                value={columnFilters[col.key]?.to || ''}
+                                onChange={e => {
+                                  const current = columnFilters[col.key] || { type: 'range', from: '', to: '' };
+                                  setColumnFilters(prev => ({ ...prev, [col.key]: { ...current, to: e.target.value } }));
+                                }}
+                              />
+                            </div>
+                            <div className="popup-footer">
+                              <button className="popup-btn" onClick={() => clearColumnFilter(col.key)}>Clear</button>
+                              <button className="popup-btn primary" onClick={() => setActiveFilterCol(null)}>Close</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="popup-search">
+                              <input type="text" placeholder="Search..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
+                            </div>
+                            <div className="popup-list">
+                              {(() => {
+                                const allValues = getUniqueValues(col.key);
+                                const filtered = filterSearch
+                                  ? allValues.filter(v => getDropdownLabel(col, v).toLowerCase().includes(filterSearch.toLowerCase()))
+                                  : allValues;
+                                const currentSet = columnFilters[col.key] || new Set();
+                                const allSelected = filtered.length > 0 && filtered.every(v => currentSet.has(v));
+                                return (
+                                  <>
+                                    <div className="popup-item" onClick={() => {
+                                      const newSet = new Set(currentSet);
+                                      if (allSelected) { filtered.forEach(v => newSet.delete(v)); }
+                                      else { filtered.forEach(v => newSet.add(v)); }
+                                      applyColumnFilter(col.key, newSet);
+                                    }}>
+                                      <input type="checkbox" checked={allSelected} readOnly />
+                                      <label>(Select All)</label>
+                                    </div>
+                                    {filtered.map(val => (
+                                      <div key={val} className="popup-item" onClick={() => {
+                                        const newSet = new Set(currentSet);
+                                        if (newSet.has(val)) newSet.delete(val);
+                                        else newSet.add(val);
+                                        applyColumnFilter(col.key, newSet);
+                                      }}>
+                                        <input type="checkbox" checked={currentSet.has(val)} readOnly />
+                                        <label title={getDropdownLabel(col, val)}>{getDropdownLabel(col, val)}</label>
+                                      </div>
+                                    ))}
+                                    {filtered.length === 0 && (
+                                      <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>No values found</div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <div className="popup-footer">
+                              <button className="popup-btn" onClick={() => clearColumnFilter(col.key)}>Clear</button>
+                              <button className="popup-btn primary" onClick={() => setActiveFilterCol(null)}>Close</button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, col.id)} />
                 </th>
               ))}
             </tr>

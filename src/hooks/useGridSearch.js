@@ -51,12 +51,12 @@ function estimateWidth(displayName) {
  * - Numbers → raw number
  */
 function formatParamValue(value, dataType) {
-  const dt = (dataType || '').toLowerCase();
-  const isNumeric = ['numeric', 'int', 'bigint', 'smallint', 'tinyint', 'decimal', 'float', 'bit'].includes(dt);
+  // console.log("see value:", value)
+  // console.log("see dataType:", dataType)
 
-  if (!isNumeric) {
+  if (dataType === 'numeric') {
     // Assume string/varchar for anything non-numeric
-    return `'${value ?? ''}'`;
+    return `${value ?? ''}`;
   }
 
   return value != null && value !== '' ? String(value) : '0';
@@ -170,36 +170,66 @@ export function useGridSearch() {
 
       // ── Step E: Build procedure call string ───────────────────
       // Match each parameter with filter definitions, use filter value or default
+      console.log("see paramList:", paramList)
       const paramValues = paramList.map((param) => {
-        const paramName = param.PARAMETER_NAME; // e.g. "@prmDivisionID"
-        const dataType = param.DATA_TYPE;       // e.g. "numeric" or "varchar"
+        const paramName = param?.PARAMETER_NAME?.trim(); // e.g. "@prmDivisionID"
+        const dataType = param?.DATA_TYPE?.toLowerCase()?.trim();       // e.g. "numeric" or "varchar"
+
+        // this is for fixed filters 
+        // @prmCompanyID  = 1
+        // @prmYearID = 13
+        // @prmLoginID = 1                                              
+        // @prmSessionID  = 88                                                                      
+        // @prmIsRptGroupSelected   = ''                                        
+        // @prmRptGroupID = ''
+
+        switch (paramName) {
+          case "@prmCompanyID":
+            return "1";
+          case "@prmYearID":
+            return "13";
+          case "@prmLoginID":
+            return "1";
+          case "@prmSessionID":
+            return "88";
+          case "@prmIsRptGroupSelected":
+            return "''";
+          case "@prmRptGroupID":
+            return "''";
+        }
 
         // Find matching filter definition
+        console.log("see filterDefs:", filterDefs)
         const matchingFilter = (filterDefs || []).find(
           (f) => f.FilterParameterName === paramName
         );
+        // console.log("see matchingFilter:", matchingFilter)
+        // console.log("see paramName:", paramName)
+        // console.log("see dataType:", dataType)
 
         if (matchingFilter) {
           // Use the current filter value
+          // console.log("see filterValues:", filterValues)
           const rawValue = filterValues[matchingFilter.FilterColName];
+          // console.log("see rawValue:", filterValues)
           return formatParamValue(rawValue, dataType);
         }
 
         // No match — use default based on data type
-        const dt = (dataType || '').toLowerCase();
-        const isNumeric = ['numeric', 'int', 'bigint', 'smallint', 'tinyint', 'decimal', 'float', 'bit'].includes(dt);
-        if (isNumeric) return '0';
+        if (dataType === "numeric") return '0';
         return "''";
       });
-
+      // console.log("see paramValues:", paramValues)
       // Join without spaces: pr_RB_MktActionEntry 0,0,0,0,'','','','','',1
       const procString = `${queryName} ${paramValues.join(',')}`;
       console.log('%c[Search] Proc string:', 'color:#f59e0b;font-weight:600', procString);
 
       // ── Step F: Fetch grid data ───────────────────────────────
       const rowData = await apiClient.get(ENDPOINTS.GET_MASTER_DATA_FILL, {
-        // params: { prmProcedure: procString },
-        params: { prmProcedure: "pr_RB_MktActionEntry 1, 13, 1, 88, '', '', '', '', '', 1" },
+        params: { prmProcedure: procString },
+        // params: { prmProcedure: "pr_RB_MktActionEntry 1, 13, 1, 88, '', '', '', '', '', 1" },
+
+
       });
       const apiRows = (rowData?.Links || []).map((row, idx) => ({
         ...row,
