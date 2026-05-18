@@ -81,10 +81,14 @@ function FilterControl({ filter, value, options, onChange }) {
             id={`fp-${FilterColName}`}
             value={value || ''}
             onChange={(val) => onChange(FilterColName, val)}
-            options={(options || []).map((opt) => ({
-              value: String(opt.IDNumber),
-              label: opt.Name,
-            }))}
+            options={(options || []).map((opt) => {
+              const valKey = opt.FilterCtrlValueCol || 'IDNumber';
+              const labelKey = opt.FilterCtrlDisplayCol || 'Name';
+              return {
+                value: String(opt[valKey]),
+                label: opt[labelKey],
+              };
+            })}
             placeholder={`-- Select ${FilterCaption} --`}
             ariaLabel={FilterCaption}
           />

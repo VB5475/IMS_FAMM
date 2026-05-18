@@ -30,6 +30,9 @@ export const ENDPOINTS = {
 
   /** Fetches grid row data by executing the built procedure string */
   GET_MASTER_DATA_FILL: '/GetMasterDataFill',
+
+  /** Saves duplicated/checked rows to the backend */
+  SAVE_MKT_ACTION: '/RB_MktActionEntry',
 };
 
 /**

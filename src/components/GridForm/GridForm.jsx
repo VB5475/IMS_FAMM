@@ -99,7 +99,7 @@ function parseDateFromInput(dateString) {
   return `${dateString}T00:00:00`;
 }
 
-export default function GridForm({ config, initialData, title = 'Grid Form' }) {
+export default function GridForm({ config, initialData, title = 'Grid Form', onSave }) {
   const { columns, pagination } = config;
   const { pageSize: defaultPageSize = 10, pageSizeOptions = [10, 25, 50, 100] } = pagination || {};
 
@@ -291,20 +291,34 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
     }));
   }, []);
 
-  const handleDeleteSelected = useCallback(() => {
+  const handleSaveSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(`Delete ${selectedIds.size} selected row(s)?`)) {
-      setRows(prev => prev.filter(r => !selectedIds.has(String(r.id))));
-      setSelectedIds(new Set());
+    if (onSave) {
+      const selectedRows = rows.filter(r => selectedIds.has(String(r.id)));
+      onSave(selectedRows);
     }
-  }, [selectedIds]);
+  }, [selectedIds, rows, onSave]);
 
   const handleCopySelected = useCallback(() => {
     if (selectedIds.size === 0) return;
     const toCopy = rows.filter(r => selectedIds.has(String(r.id)));
-    const newRows = toCopy.map(r => ({ ...r, id: generateId() }));
+
+    // Find the current minimum negative IDNumber to continue the sequence seamlessly
+    let currentMinId = 0;
+    rows.forEach(r => {
+      const idNum = Number(r.IDNumber);
+      if (idNum < currentMinId) currentMinId = idNum;
+    });
+
+    const newRows = toCopy.map((r, idx) => {
+      const newId = currentMinId - (idx + 1);
+      return { ...r, id: newId, IDNumber: newId };
+    });
+
     setRows(prev => [...prev, ...newRows]);
-    setSelectedIds(new Set(newRows.map(r => String(r.id))));
+
+    // Deselect all rows after duplication
+    setSelectedIds(new Set());
     const newTotal = processedRows.length + newRows.length;
     const lastPage = Math.ceil(newTotal / pageSize);
     setPage(lastPage);
@@ -482,9 +496,9 @@ export default function GridForm({ config, initialData, title = 'Grid Form' }) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
             Duplicate ({selectedIds.size})
           </button>
-          <button className="toolbar-btn danger" onClick={handleDeleteSelected} disabled={selectedIds.size === 0} title="Delete Selected">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-            Delete ({selectedIds.size})
+          <button className="toolbar-btn primary" onClick={handleSaveSelected} disabled={selectedIds.size === 0} title="Save Selected">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
+            Save ({selectedIds.size})
           </button>
         </div>
         <div className="grid-toolbar-right">

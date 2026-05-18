@@ -126,7 +126,11 @@ export function useGridSearch() {
                 },
               });
               colDropdownOptions[col.ColName] = (detailData?.Links || []).map(
-                (opt) => ({ value: String(opt.IDNumber), label: opt.Name })
+                (opt) => {
+                  const valKey = opt.FilterCtrlValueCol || 'IDNumber';
+                  const labelKey = opt.FilterCtrlDisplayCol || 'Name';
+                  return { value: String(opt[valKey]), label: opt[labelKey] };
+                }
               );
             } catch {
               console.warn(`[Search] Failed dropdown for column: ${col.DisplayName}`);
@@ -137,17 +141,36 @@ export function useGridSearch() {
       }
 
       // ── Step C: Transform columns to GridForm format ──────────
-      const gridColumns = apiColumns.map((col, index) => ({
-        id: col.ColName,
-        name: col.DisplayName,
-        key: col.ColName,
-        controlType: col.ColCtrlType,
-        width: estimateWidth(col.DisplayName),
-        filterable: true,
-        filterType: deriveFilterType(col.ColCtrlType),
-        isFixed: index === 0, // first column fixed
-        dropdownOptions: colDropdownOptions[col.ColName] || [],
-      }));
+      // Filter out invisible columns, then map to grid format
+      const dataColumns = apiColumns
+        .filter(col => col.IsVisible !== false)
+        .map((col) => ({
+          id: col.ColName,
+          name: col.DisplayName,
+          key: col.ColName,
+          controlType: col.ColCtrlType,
+          width: estimateWidth(col.DisplayName),
+          filterable: true,
+          filterType: deriveFilterType(col.ColCtrlType),
+          isFixed: col.IsFreezeReq === true, // Use API flag for freezing
+          dropdownOptions: colDropdownOptions[col.ColName] || [],
+        }));
+
+      // Sort data columns so fixed ones appear right after the checkbox
+      dataColumns.sort((a, b) => (a.isFixed === b.isFixed ? 0 : a.isFixed ? -1 : 1));
+
+      const gridColumns = [
+        {
+          id: 'cb',
+          name: '',
+          key: 'cb',
+          controlType: -1,
+          width: 48,
+          filterable: false,
+          isFixed: true, // check box is always fixed
+        },
+        ...dataColumns
+      ];
 
       setColumns(gridColumns);
       console.log('%c[Search] Grid columns built:', 'color:#22c55e;font-weight:600', gridColumns.length);
@@ -251,6 +274,23 @@ export function useGridSearch() {
     }
   }, []);
 
+  const saveSelectedRows = useCallback(async (selectedRows) => {
+    try {
+      setIsSearching(true);
+      setSearchError(null);
+      await apiClient.post(ENDPOINTS.SAVE_MKT_ACTION, {
+        TrackSysName: "",
+        RB_MktActionEntry: selectedRows
+      });
+      alert('Saved successfully!');
+    } catch (err) {
+      console.error('[Save] Failed:', err);
+      setSearchError(err?.message || 'Save failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
   return {
     columns,
     rows,
@@ -259,5 +299,6 @@ export function useGridSearch() {
     hasSearched,
     fetchMasterDetail,
     handleSearch,
+    saveSelectedRows,
   };
 }

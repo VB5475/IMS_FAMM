@@ -15,6 +15,7 @@ function App() {
     hasSearched,
     fetchMasterDetail,
     handleSearch,
+    saveSelectedRows,
   } = useGridSearch();
 
   // Fetch master detail on page load and store in localStorage
@@ -65,6 +66,7 @@ function App() {
             }}
             initialData={rows}
             title={gridMeta.title}
+            onSave={saveSelectedRows}
           />
         ) : (
           !isSearching && !searchError && (
