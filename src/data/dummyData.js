@@ -9,13 +9,13 @@ export const controlTypeMap = {
   TEXTAREA: 9
 };
 
-export const controlTypeName = {
-  0: 'Label',
-  1: 'TextBox',
-  2: 'Date',
-  4: 'Dropdown',
-  9: 'Textarea'
-};
+// export const controlTypeName = {
+//   0: 'Label',
+//   1: 'TextBox',
+//   2: 'Date',
+//   4: 'Dropdown',
+//   9: 'Textarea'
+// };
 
 export const gridMeta = {
   title: 'RB Marketing Action',

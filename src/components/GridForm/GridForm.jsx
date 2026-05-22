@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import SearchSelect from '../SearchSelect/SearchSelect';
+import SearchSelect from '../Common/SearchSelect/SearchSelect';
+import BottomControlPanel from './BottomControlPanel';
+import { Filter, X, ChevronDown } from 'lucide-react';
+
 import './GridForm.css';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -83,11 +86,9 @@ function toPixels(w) {
 // ─── Date Helpers ─────────────────────────────────────────────────────────
 function formatDateForInput(isoString) {
   if (!isoString) return '';
-  // Handle "2026-05-25T00:00:00" → "2026-05-25"
   if (typeof isoString === 'string' && isoString.includes('T')) {
     return isoString.split('T')[0];
   }
-  // Handle Date objects or other formats
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '';
   return d.toISOString().split('T')[0];
@@ -95,7 +96,6 @@ function formatDateForInput(isoString) {
 
 function parseDateFromInput(dateString) {
   if (!dateString) return '';
-  // Return as "2026-05-25T00:00:00" to preserve backend format
   return `${dateString}T00:00:00`;
 }
 
@@ -206,7 +206,6 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
         data = data.filter(r => {
           const val = r[key];
           if (val == null || val === '') return false;
-          // Normalize ISO dates for comparison
           const dateStr = typeof val === 'string' && val.includes('T') ? val.split('T')[0] : val;
           const dateVal = new Date(dateStr);
           if (isNaN(dateVal)) return false;
@@ -303,7 +302,6 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
     if (selectedIds.size === 0) return;
     const toCopy = rows.filter(r => selectedIds.has(String(r.id)));
 
-    // Find the current minimum negative IDNumber to continue the sequence seamlessly
     let currentMinId = 0;
     rows.forEach(r => {
       const idNum = Number(r.IDNumber);
@@ -315,14 +313,35 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
       return { ...r, id: newId, IDNumber: newId };
     });
 
-    setRows(prev => [...prev, ...newRows]);
+    setRows(prev => {
+      const nextRows = [...prev];
+      for (let i = toCopy.length - 1; i >= 0; i--) {
+        const origRow = toCopy[i];
+        const newRow = newRows[i];
+        const idx = nextRows.findIndex(r => String(r.id) === String(origRow.id));
+        if (idx !== -1) {
+          nextRows.splice(idx + 1, 0, newRow);
+        } else {
+          nextRows.push(newRow);
+        }
+      }
+      return nextRows;
+    });
 
-    // Deselect all rows after duplication
     setSelectedIds(new Set());
-    const newTotal = processedRows.length + newRows.length;
-    const lastPage = Math.ceil(newTotal / pageSize);
-    setPage(lastPage);
-  }, [selectedIds, rows, processedRows.length, pageSize]);
+
+    if (toCopy.length > 0) {
+      const firstOrig = toCopy[0];
+      const firstOrigIndex = processedRows.findIndex(r => String(r.id) === String(firstOrig.id));
+      if (firstOrigIndex !== -1) {
+        const firstNewRowIndex = firstOrigIndex + 1;
+        const targetPage = Math.floor(firstNewRowIndex / pageSize) + 1;
+        if (targetPage !== page) {
+          setPage(targetPage);
+        }
+      }
+    }
+  }, [selectedIds, rows, processedRows, pageSize, page]);
 
   const handleExportExcel = useCallback(() => {
     const headers = columns.map(c => c.name).join(',');
@@ -398,7 +417,6 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
       case 0: return <span className="cell-label" title={value}>{value}</span>;
       case 1: return <input type="text" {...commonProps} />;
       case 2: {
-        // Date: convert ISO "2026-05-25T00:00:00" → "2026-05-25" for input
         const dateValue = formatDateForInput(value);
         return (
           <input
@@ -473,44 +491,48 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
     return base;
   };
 
+  /**
+   * Determine CSS classes for a column cell based on:
+   * - isFixed → blue (always)
+   * - isEditAllow → pink (editable)
+   * - !isEditAllow → grey (read-only)
+   */
   const cellClass = (col) => {
     const classes = [];
-    if (col.isFixed) classes.push('fixed-col');
-    if (col.isFixed && col.id === lastFixedColId) classes.push('last-fixed');
+
+    // Fixed columns are always blue
+    if (col.isFixed) {
+      classes.push('fixed-col');
+      if (col.id === lastFixedColId) classes.push('last-fixed');
+      return classes.join(' ') || undefined;
+    }
+
+    // Non-fixed: editable = pink, read-only = grey
+    if (col.isEditAllow) {
+      classes.push('editable-col');
+    } else {
+      classes.push('readonly-col');
+    }
+
     return classes.join(' ') || undefined;
+  };
+
+  /**
+   * Determine header theme class for icon coloring
+   * Returns 'blue-header', 'pink-header', or 'grey-header'
+   */
+  const getHeaderThemeClass = (col) => {
+    if (col.isFixed) return 'blue-header';
+    if (col.isEditAllow) return 'pink-header';
+    return 'grey-header';
   };
 
   const isDateColumn = (col) => col.controlType === 2 || col.filterType === 'date';
 
   return (
     <div className={`erp-grid-container ${resizing ? 'resizing' : ''}`}>
-      <div className="grid-toolbar">
-        <div className="grid-toolbar-left">
-          <h2 className="grid-title">{title}</h2>
-          <span className="toolbar-divider" />
-          <button className="toolbar-btn" onClick={handleExportExcel} title="Export to Excel">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-            Export Excel
-          </button>
-          <button className="toolbar-btn" onClick={handleCopySelected} disabled={selectedIds.size === 0} title="Duplicate Selected">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-            Duplicate ({selectedIds.size})
-          </button>
-          <button className="toolbar-btn primary" onClick={handleSaveSelected} disabled={selectedIds.size === 0} title="Save Selected">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
-            Save ({selectedIds.size})
-          </button>
-        </div>
-        <div className="grid-toolbar-right">
-          <button className="toolbar-btn" onClick={() => setShowCustomFilter(v => !v)} title="Custom Filter">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-            {showCustomFilter ? 'Hide Filter' : 'Create Filter'}
-          </button>
-          <button className="toolbar-btn" onClick={handleResetFilters} title="Reset All Filters">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
-            Reset
-          </button>
-        </div>
+      <div className="grid-header">
+        <h2 className="grid-title">{title}</h2>
       </div>
 
       {selectedIds.size > 0 && (
@@ -524,7 +546,7 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
         <div className="custom-filter-panel">
           <div className="custom-filter-header">
             <div className="custom-filter-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+              <Filter size={16} />
               Custom Filter Builder
             </div>
           </div>
@@ -573,7 +595,7 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
                     )
                   )}
                   <button className="filter-remove-btn" onClick={() => removeCustomFilter(cf.id)} title="Remove">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    <X size={14} />
                   </button>
                 </div>
               );
@@ -599,11 +621,22 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
               {columns.map(col => (
                 <th
                   key={col.id}
-                  className={cellClass(col)}
+                  className={`${cellClass(col) || ''} ${getHeaderThemeClass(col)}`}
                   style={cellStyle(col, 'header')}
                 >
                   <div className="header-cell-content">
-                    <span className="header-label">{col.name}</span>
+                    <span
+                      className="header-label"
+                      onClick={() => col.key !== 'cb' && handleSort(col.key)}
+                      style={{ cursor: col.key !== 'cb' ? 'pointer' : 'default' }}
+                    >
+                      {col.name}
+                      {sortConfig.key === col.key && (
+                        <span className="sort-icon" title="Sorted">
+                          {sortConfig.direction === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </span>
                     {col.filterable && col.key !== 'cb' && (
                       <div className="header-actions">
                         <button
@@ -612,13 +645,8 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
                           title="Column Filter"
                           aria-label={`Filter ${col.name}`}
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+                          <Filter size={12} />
                         </button>
-                        {sortConfig.key === col.key && (
-                          <span className="sort-icon" title="Sorted">
-                            {sortConfig.direction === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
                       </div>
                     )}
                     {activeFilterCol === col.key && (
@@ -813,6 +841,16 @@ export default function GridForm({ config, initialData, title = 'Grid Form', onS
           <button className="page-btn" onClick={() => setPage(totalPages)} disabled={safePage >= totalPages}>»</button>
         </div>
       </div>
+
+      <BottomControlPanel
+        selectedCount={selectedIds.size}
+        showCustomFilter={showCustomFilter}
+        onToggleCustomFilter={() => setShowCustomFilter(v => !v)}
+        onResetFilters={handleResetFilters}
+        onExportExcel={handleExportExcel}
+        onCopy={handleCopySelected}
+        onSave={handleSaveSelected}
+      />
     </div>
   );
 }

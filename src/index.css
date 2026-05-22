@@ -1,8 +1,21 @@
-/* Reset defaults */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* index.css — Base reset & typography only.
+   Design tokens live in App.css :root         */
+
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; */
+   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f1f5f9;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+
+ 
+}
+
+html { scroll-behavior: smooth; }
+
+::selection {
+  background: rgba(37, 99, 168, 0.15);
+  color: var(--navy);
 }

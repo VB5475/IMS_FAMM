@@ -10,7 +10,7 @@ import {
   ENDPOINTS,
   CBO_MODE,
   STORAGE_KEYS,
-  DEFAULT_MASTER_ID,
+  // DEFAULT_MASTER_ID,
   DEFAULT_LOGIN_ID,
   DEFAULT_COMPANY_ID,
   DEFAULT_YEAR_ID,
@@ -33,10 +33,15 @@ function deriveFilterType(ctrlType) {
 }
 
 /**
- * Estimate a reasonable column width from the display name length.
+ * Use ColumnWidth from API directly, with a fallback.
  */
-function estimateWidth(displayName) {
-  const len = (displayName || '').length;
+function getColumnWidth(apiCol) {
+  // Use API-provided ColumnWidth if > 0
+  if (apiCol.ColumnWidth && apiCol.ColumnWidth > 0) {
+    return apiCol.ColumnWidth;
+  }
+  // Fallback: estimate from display name length
+  const len = (apiCol.DisplayName || '').length;
   if (len <= 4) return 80;
   if (len <= 8) return 110;
   if (len <= 14) return 150;
@@ -51,14 +56,9 @@ function estimateWidth(displayName) {
  * - Numbers → raw number
  */
 function formatParamValue(value, dataType) {
-  // console.log("see value:", value)
-  // console.log("see dataType:", dataType)
-
   if (dataType === 'numeric') {
-    // Assume string/varchar for anything non-numeric
     return `${value ?? ''}`;
   }
-
   return value != null && value !== '' ? String(value) : '0';
 }
 
@@ -70,6 +70,7 @@ export function useGridSearch() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [masterDetail, setMasterDetail] = useState(null);
 
   // ── 1. Fetch & store master detail ──────────────────────────────
   const fetchMasterDetail = useCallback(async (masterID = DEFAULT_MASTER_ID) => {
@@ -79,6 +80,7 @@ export function useGridSearch() {
       });
       const detail = data?.Links?.[0] || null;
       if (detail) {
+        setMasterDetail(detail);
         localStorage.setItem(STORAGE_KEYS.MASTER_DETAIL, JSON.stringify(detail));
         console.log('%c[MasterDetail] Stored:', 'color:#6366f1;font-weight:600', detail);
       }
@@ -107,7 +109,6 @@ export function useGridSearch() {
       const colDropdownOptions = {};
 
       if (dropdownCols.length > 0) {
-        // Get master detail for funcCode & divisionID
         const storedDetail = JSON.parse(
           localStorage.getItem(STORAGE_KEYS.MASTER_DETAIL) || '{}'
         );
@@ -141,7 +142,6 @@ export function useGridSearch() {
       }
 
       // ── Step C: Transform columns to GridForm format ──────────
-      // Filter out invisible columns, then map to grid format
       const dataColumns = apiColumns
         .filter(col => col.IsVisible !== false)
         .map((col) => ({
@@ -149,10 +149,11 @@ export function useGridSearch() {
           name: col.DisplayName,
           key: col.ColName,
           controlType: col.ColCtrlType,
-          width: estimateWidth(col.DisplayName),
+          width: getColumnWidth(col),        // ← Use API ColumnWidth
           filterable: true,
           filterType: deriveFilterType(col.ColCtrlType),
           isFixed: col.IsFreezeReq === true, // Use API flag for freezing
+          isEditAllow: col.IsEditAllow === true, // ← NEW: editable flag
           dropdownOptions: colDropdownOptions[col.ColName] || [],
         }));
 
@@ -167,7 +168,8 @@ export function useGridSearch() {
           controlType: -1,
           width: 48,
           filterable: false,
-          isFixed: true, // check box is always fixed
+          isFixed: true, // checkbox is always fixed
+          isEditAllow: false, // checkbox is never editable
         },
         ...dataColumns
       ];
@@ -192,19 +194,9 @@ export function useGridSearch() {
       console.log('%c[Search] Parameters:', 'color:#6366f1;font-weight:600', paramList.length);
 
       // ── Step E: Build procedure call string ───────────────────
-      // Match each parameter with filter definitions, use filter value or default
-      console.log("see paramList:", paramList)
       const paramValues = paramList.map((param) => {
-        const paramName = param?.PARAMETER_NAME?.trim(); // e.g. "@prmDivisionID"
-        const dataType = param?.DATA_TYPE?.toLowerCase()?.trim();       // e.g. "numeric" or "varchar"
-
-        // this is for fixed filters 
-        // @prmCompanyID  = 1
-        // @prmYearID = 13
-        // @prmLoginID = 1                                              
-        // @prmSessionID  = 88                                                                      
-        // @prmIsRptGroupSelected   = ''                                        
-        // @prmRptGroupID = ''
+        const paramName = param?.PARAMETER_NAME?.trim();
+        const dataType = param?.DATA_TYPE?.toLowerCase()?.trim();
 
         switch (paramName) {
           case "@prmCompanyID":
@@ -221,38 +213,25 @@ export function useGridSearch() {
             return "''";
         }
 
-        // Find matching filter definition
-        console.log("see filterDefs:", filterDefs)
         const matchingFilter = (filterDefs || []).find(
           (f) => f.FilterParameterName === paramName
         );
-        // console.log("see matchingFilter:", matchingFilter)
-        // console.log("see paramName:", paramName)
-        // console.log("see dataType:", dataType)
 
         if (matchingFilter) {
-          // Use the current filter value
-          // console.log("see filterValues:", filterValues)
           const rawValue = filterValues[matchingFilter.FilterColName];
-          // console.log("see rawValue:", filterValues)
           return formatParamValue(rawValue, dataType);
         }
 
-        // No match — use default based on data type
         if (dataType === "numeric") return '0';
         return "''";
       });
-      // console.log("see paramValues:", paramValues)
-      // Join without spaces: pr_RB_MktActionEntry 0,0,0,0,'','','','','',1
+
       const procString = `${queryName} ${paramValues.join(',')}`;
       console.log('%c[Search] Proc string:', 'color:#f59e0b;font-weight:600', procString);
 
       // ── Step F: Fetch grid data ───────────────────────────────
       const rowData = await apiClient.get(ENDPOINTS.GET_MASTER_DATA_FILL, {
         params: { prmProcedure: procString },
-        // params: { prmProcedure: "pr_RB_MktActionEntry 1, 13, 1, 88, '', '', '', '', '', 1" },
-
-
       });
       const apiRows = (rowData?.Links || []).map((row, idx) => ({
         ...row,
@@ -274,14 +253,30 @@ export function useGridSearch() {
     }
   }, []);
 
+  // ── 3. Save selected rows ────────────────────────────────────────
   const saveSelectedRows = useCallback(async (selectedRows) => {
     try {
       setIsSearching(true);
       setSearchError(null);
-      await apiClient.post(ENDPOINTS.SAVE_MKT_ACTION, {
-        TrackSysName: "",
-        RB_MktActionEntry: selectedRows
+
+      const storedDetail = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.MASTER_DETAIL) || '{}'
+      );
+      const dataSaveProcName = storedDetail.DataSaveProcName || '';
+
+      console.log("see selected rows:", selectedRows)
+      const strJson = JSON.stringify(selectedRows);
+
+      await apiClient.post(ENDPOINTS.RB_REPORTBOARD_DETAIL_SAVE, null, {
+        params: {
+          TrackSysName: '',
+          strRBSaveProcName: dataSaveProcName,
+          strJson: strJson,
+          prmErrCode: -1,
+          prmErrMsg: '',
+        },
       });
+
       alert('Saved successfully!');
     } catch (err) {
       console.error('[Save] Failed:', err);
@@ -291,12 +286,15 @@ export function useGridSearch() {
     }
   }, []);
 
+
+
   return {
     columns,
     rows,
     isSearching,
     searchError,
     hasSearched,
+    masterDetail,
     fetchMasterDetail,
     handleSearch,
     saveSelectedRows,

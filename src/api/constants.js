@@ -1,18 +1,13 @@
 // constants.js — All API-related constants for the project
 // ─────────────────────────────────────────────────────────
 
-/**
- * Base URL for all API requests.
- * Every endpoint is appended to this root.
- */
 export const API_BASE_URL =
   'http://122.179.135.100:8095/ERPWS_TB/webservice/WsIMS.asmx';
 
-/**
- * Endpoint paths.
- * Add new endpoints here as the project grows.
- */
 export const ENDPOINTS = {
+  /** Dashboard: fetches report board summary rows (ReportBoardName, Overdue, etc.) */
+  FN_FETCH_DATA: '/FN_Fetch_Data',
+
   /** Fetches filter definitions for a given master ID */
   GET_FILTERS: '/GetFilters',
 
@@ -31,40 +26,32 @@ export const ENDPOINTS = {
   /** Fetches grid row data by executing the built procedure string */
   GET_MASTER_DATA_FILL: '/GetMasterDataFill',
 
-  /** Saves duplicated/checked rows to the backend */
-  SAVE_MKT_ACTION: '/RB_MktActionEntry',
+  /** Saves selected rows to the backend */
+  RB_REPORTBOARD_DETAIL_SAVE: '/RB_ReportBoardDetail_Save',
 };
 
 /**
- * CBO Mode values for GET_FILTER_DETAIL.
- * "F" = FilterPanel dropdowns, "C" = Column (GridForm) dropdowns
+ * Params for FN_FETCH_DATA when fetching the report board summary.
+ * ObjType=2, ObjName identifies the stored function.
  */
+export const REPORT_BOARD_SUMMARY = {
+  OBJ_TYPE: 2,
+  OBJ_NAME: 'Fn_tbl_FetchReportBoardSummaryUserWise',
+};
+
 export const CBO_MODE = {
   FILTER: 'F',
   COLUMN: 'C',
 };
 
-/**
- * localStorage keys used across the app.
- */
 export const STORAGE_KEYS = {
   MASTER_DETAIL: 'masterDetail',
 };
 
-/**
- * Default IDs used across filter/panel queries.
- * These are used when building the procedure call string
- * for parameters that don't map to any filter control.
- */
-export const DEFAULT_MASTER_ID = 20006;
 export const DEFAULT_LOGIN_ID = 1;
 export const DEFAULT_COMPANY_ID = 1;
 export const DEFAULT_YEAR_ID = 13;
 export const DEFAULT_SESSION_ID = 88;
 export const DEFAULT_DIVISION_ID = 0;
 
-/**
- * Request timeout in milliseconds.
- * Applied globally via the Axios instance.
- */
 export const API_TIMEOUT = 30000;
