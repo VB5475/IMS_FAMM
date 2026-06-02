@@ -1,0 +1,169 @@
+/* Shared structural styles — theme tokens come from each app's theme CSS */
+
+/* ===== RESET ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== APP CONTAINER ===== */
+.app {
+  display: flex;
+  flex-direction: column;
+  /* min-height: 100vh; */
+  width: 100%;
+  gap: 12px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* ===== HEADER ===== */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.03em;
+}
+
+.app-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.app-meta strong {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+/* ===== MAIN CONTAINER ===== */
+.app-main {
+  flex: 1;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-dark);
+  background: var(--surface);
+  gap: 0;
+}
+
+/* ===== FILTER SECTION ===== */
+.app-filter-section {
+  flex-shrink: 0;
+  z-index: 50;
+  position: relative;
+  overflow: visible;
+  padding: 16px 16px 0 16px;
+  background: var(--surface);
+  /* border-radius: var(--radius-lg) var(--radius-lg) 0 0; */
+}
+
+/* ===== GRID SECTION ===== */
+.app-grid-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--surface);
+  margin: 12px 16px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,0.03),
+    0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* ── Empty grid placeholder ── */
+.app-empty-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 80px 20px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  color: var(--text-muted);
+  border-radius: 10px;
+  min-height: 400px;
+}
+
+.app-empty-grid svg { opacity: 0.35; }
+
+.app-empty-grid p {
+  font-size: 1rem;
+  text-align: center;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.app-empty-grid strong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* ── Searching overlay ── */
+.app-searching {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+}
+
+.app-searching-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: app-spin 0.7s linear infinite;
+}
+
+@keyframes app-spin { to { transform: rotate(360deg); } }
+
+/* ── Search error ── */
+.app-search-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--danger);
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  margin: 10px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+  font-weight: 500;
+}
+
+.app-search-error svg { flex-shrink: 0; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .app { padding: 10px; gap: 10px; }
+  .app-main { border-radius: var(--radius); }
+  .app-filter-section { padding: 10px 10px 0 10px; }
+  .app-grid-section { margin: 8px 10px 10px; }
+}

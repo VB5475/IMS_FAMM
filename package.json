@@ -1,11 +1,19 @@
 {
   "name": "famm",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "vite",
+    "dev:nexus": "npm run dev --workspace=famm-nexus",
+    "dev:horizon": "npm run dev --workspace=famm-horizon",
     "build": "vite build",
+    "build:nexus": "npm run build --workspace=famm-nexus",
+    "build:horizon": "npm run build --workspace=famm-horizon",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,0 +1,160 @@
+/* TxnHeaderPanel.css
+   Hardcoded header fields panel for TxnEntryForm.
+   Reuses the same design tokens as FilterPanel.css.
+*/
+
+/* ── Container ───────────────────────────────────────────────────────── */
+.txn-header-panel {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 10px);
+  overflow: hidden;
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.25));
+}
+
+/* ── Panel header bar ────────────────────────────────────────────────── */
+.txn-header-bar {
+  background: linear-gradient(135deg, var(--primary, #6366f1) 0%, var(--primary-dark, #4f46e5) 100%);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.txn-header-bar h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* ── Fields grid ─────────────────────────────────────────────────────── */
+.txn-fields-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 14px 16px;
+  align-items: flex-end;
+}
+
+/* ── Each field ──────────────────────────────────────────────────────── */
+.txn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+
+.txn-field label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.txn-field input[type='text'],
+.txn-field input[type='date'],
+.txn-field input[type='number'],
+.txn-field select {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text, #e2e8f0);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.txn-field input[type='text']:focus,
+.txn-field input[type='date']:focus,
+.txn-field input[type='number']:focus,
+.txn-field select:focus {
+  border-color: var(--primary, #6366f1);
+  background: var(--surface-3, rgba(99, 102, 241, 0.08));
+}
+
+.txn-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0aec0' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+/* ── SearchSelect wrapper inside txn-field ───────────────────────────── */
+.txn-field .search-select-wrapper {
+  height: 32px;
+}
+
+/* ── Add New button wrapper ──────────────────────────────────────────── */
+.txn-add-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 110px;
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
+.txn-add-wrap span {
+  font-size: 0.72rem;
+  color: transparent; /* spacer to align with other labels */
+  user-select: none;
+}
+
+/* ── Add New button ──────────────────────────────────────────────────── */
+.txn-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+.txn-add-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.txn-add-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.txn-add-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.txn-add-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: txn-spin 0.7s linear infinite;
+}
+
+@keyframes txn-spin {
+  to { transform: rotate(360deg); }
+}

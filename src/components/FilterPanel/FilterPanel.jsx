@@ -3,6 +3,18 @@
 // populates dropdown options from GetFilterDetail API.
 // masterID is always received as a prop — never falls back
 // to DEFAULT_MASTER_ID inside this component.
+//
+// ── Static mode ─────────────────────────────────────────────────────────
+// Pass `staticFilters` (array of filter definition objects) to bypass all
+// API calls entirely.  The panel skips GET_FILTERS and GET_FILTER_DETAIL
+// and renders the provided definitions immediately (isLoading = false).
+// Useful for entry forms that have hardcoded header fields.
+//
+// ── Action button customisation ──────────────────────────────────────────
+// `actionLabel`  — button text         (default: 'Search')
+// `ActionIcon`   — lucide-react component (default: Search icon)
+// These props let TxnEntryForm show a green "Add New" button while
+// MainForm continues to get the white "Search" button unchanged.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../../api/useApi';
@@ -19,7 +31,7 @@ import Loader from '../Common/Loader/Loader';
  *   0 → Label    (read-only)
  *   1 → TextBox
  *   2 → Date
- *   4 → Dropdown (options fetched from GetFilterDetail)
+ *   4 → Dropdown (options fetched from GetFilterDetail OR passed via staticOptions)
  *   9 → Textarea
  */
 function FilterControl({ filter, value, options, onChange }) {
@@ -78,6 +90,9 @@ function FilterControl({ filter, value, options, onChange }) {
             value={value || ''}
             onChange={(val) => onChange(FilterColName, val)}
             options={(options || []).map((opt) => {
+              // API-fetched options have FilterCtrlValueCol / FilterCtrlDisplayCol
+              // Static options can be plain { value, label } pairs
+              if (opt.value !== undefined) return { value: String(opt.value), label: opt.label };
               const valKey = opt.FilterCtrlValueCol || 'IDNumber';
               const labelKey = opt.FilterCtrlDisplayCol || 'Name';
               return { value: String(opt[valKey]), label: opt[labelKey] };
@@ -118,35 +133,71 @@ function FilterControl({ filter, value, options, onChange }) {
  * FilterPanel
  *
  * Props:
- *   masterID    — ReportBoardID from the URL param; passed to every API call
- *   loginID     — login ID for GetFilterDetail
- *   funcCode    — function code for GetFilterDetail
- *   divisionID  — division ID for GetFilterDetail
- *   title       — header text
- *   onSearch    — (filterValues, filterDefinitions) => void
- *   isSearching — disables Search button while grid is loading
+ *   masterID      — ReportBoardID from the URL param; passed to every API call
+ *   loginID       — login ID for GetFilterDetail
+ *   funcCode      — function code for GetFilterDetail
+ *   divisionID    — division ID for GetFilterDetail
+ *   title         — header text
+ *   onSearch      — (filterValues, filterDefinitions) => void
+ *   isSearching   — disables action button while grid is loading
+ *
+ *   staticFilters — [NEW] array of filter definition objects.
+ *                   When provided, ALL API calls are skipped. The panel
+ *                   renders these definitions immediately (no loading state).
+ *                   Each object must have at minimum:
+ *                     { FilterParameterID, FilterColName, FilterCaption, FilterColCtrlType }
+ *                   For DROPDOWN fields, pass `staticOptions` on the object
+ *                   (array of { value, label }) to pre-fill options.
+ *
+ *   actionLabel   — [NEW] label on the action button  (default: 'Search')
+ *   ActionIcon    — [NEW] lucide-react icon component (default: Search icon)
  */
 export default function FilterPanel({
   title = '',
-  masterID,               // ← required; supplied by MainForm via useParams
+  masterID,
   loginID = DEFAULT_LOGIN_ID,
   funcCode = '',
   divisionID = 0,
   onSearch,
   isSearching = false,
   onFiltersLoaded,
+  // ── New props ──────────────────────────────────────────
+  staticFilters = null,   // bypass GET_FILTERS + GET_FILTER_DETAIL when set
+  actionLabel = 'Search', // button text
+  ActionIcon = null,      // icon component; null → defaults to Search icon
+  onFilterChange = null,  // (colName, value) → void — notifies parent of changes
 }) {
   const { get } = useApi();
 
-  const [filters, setFilters] = useState([]);
+  // In static mode: seed filters immediately, no loading needed
+  const [filters, setFilters]               = useState(staticFilters || []);
   const [dropdownOptions, setDropdownOptions] = useState({});
-  const [values, setValues] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [values, setValues]                 = useState({});
+  const [isLoading, setIsLoading]           = useState(staticFilters === null); // false when static
+  const [errorMsg, setErrorMsg]             = useState(null);
 
-  // ── Fetch filter definitions ──────────────────────────────────
+  // Resolve icon: explicit prop → Search fallback
+  const ButtonIcon = ActionIcon || Search;
+
+  // ── Static mode: notify parent immediately, no fetch ───────────────
+  useEffect(() => {
+    if (staticFilters !== null) {
+      onFiltersLoaded?.(staticFilters.length > 0);
+      // Pre-build dropdown options from staticOptions if provided
+      const optMap = {};
+      staticFilters.forEach(f => {
+        if (f.FilterColCtrlType === controlTypeMap.DROPDOWN && f.staticOptions) {
+          optMap[f.FilterParameterID] = f.staticOptions;
+        }
+      });
+      setDropdownOptions(optMap);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally run once
+
+  // ── Dynamic mode: fetch filter definitions from API ────────────────
   const fetchFilters = useCallback(async (signal) => {
-    // Do nothing until masterID is available
+    // Skip entirely in static mode
+    if (staticFilters !== null) return;
     if (!masterID) return;
 
     setIsLoading(true);
@@ -167,12 +218,10 @@ export default function FilterPanel({
       filterList.forEach((f) => {
         if (f.FilterCtrlDefaultValue != null && f.FilterCtrlDefaultValue !== '') {
           defaults[f.FilterColName] = String(f.FilterCtrlDefaultValue);
-        }
-        else if (f.FilterCtrlDefaultValue = null || f.FilterCtrlDefaultValue === '' && f.FilterColCtrlType === 4) {
-          defaults[f.FilterColName] = 0
+        } else if (f.FilterCtrlDefaultValue === null || (f.FilterCtrlDefaultValue === '' && f.FilterColCtrlType === 4)) {
+          defaults[f.FilterColName] = 0;
         }
       });
-
       setValues(defaults);
 
       // Fetch dropdown options for every DROPDOWN filter
@@ -208,9 +257,9 @@ export default function FilterPanel({
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
-  }, [get, masterID, funcCode, divisionID, loginID]);
+  }, [get, masterID, funcCode, divisionID, loginID, staticFilters]);
 
-  // Re-fetch whenever masterID changes (i.e. user navigated to a new report)
+  // Re-fetch whenever masterID changes (only runs in dynamic mode)
   useEffect(() => {
     const controller = new AbortController();
     fetchFilters(controller.signal);
@@ -219,11 +268,38 @@ export default function FilterPanel({
 
   const handleChange = useCallback((colName, value) => {
     setValues((prev) => ({ ...prev, [colName]: value }));
-  }, []);
+    onFilterChange?.(colName, value);
+  }, [onFilterChange]);
 
-  const handleSearchClick = useCallback(() => {
+  const handleActionClick = useCallback(() => {
     if (onSearch) onSearch(values, filters);
   }, [onSearch, values, filters]);
+
+  // ── Shared action button ────────────────────────────────────────────
+  const ActionButton = (
+    <div className="filter-control filter-search-wrap">
+      <span className="filter-control-label">&nbsp;</span>
+      <button
+        className={`filter-search-btn${staticFilters !== null ? ' filter-action-btn' : ''}`}
+        onClick={handleActionClick}
+        disabled={isSearching}
+        title={actionLabel}
+        aria-label={actionLabel}
+      >
+        {isSearching ? (
+          <>
+            <div className="filter-search-spinner" />
+            <span>{actionLabel}…</span>
+          </>
+        ) : (
+          <>
+            <ButtonIcon size={14} strokeWidth={2.5} />
+            <span>{actionLabel}</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <div className="filter-panel">
@@ -239,12 +315,12 @@ export default function FilterPanel({
         </header>
       </div>
 
-      {/* Loading */}
+      {/* Loading (dynamic mode only) */}
       {isLoading && (
         <Loader text='Loading Filters...' />
       )}
 
-      {/* Error */}
+      {/* Error (dynamic mode only) */}
       {!isLoading && errorMsg && (
         <div className="filter-panel-error">
           <AlertCircle size={16} strokeWidth={2} />
@@ -255,7 +331,7 @@ export default function FilterPanel({
         </div>
       )}
 
-      {/* Controls + Search */}
+      {/* Controls + action button — filters present */}
       {!isLoading && !errorMsg && filters.length > 0 && (
         <div className="filter-panel-controls">
           {filters.map((filter) => (
@@ -272,56 +348,14 @@ export default function FilterPanel({
             />
           ))}
 
-          {onSearch && (
-            <div className="filter-control filter-search-wrap">
-              <span className="filter-control-label">&nbsp;</span>
-              <button
-                className="filter-search-btn"
-                onClick={handleSearchClick}
-                disabled={isSearching}
-                title="Search"
-              >
-                {isSearching ? (
-                  <>
-                    <div className="filter-search-spinner" />
-                    <span>Searching...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search size={14} strokeWidth={2.5} />
-                    <span>Search</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          {onSearch && ActionButton}
         </div>
       )}
 
-      {/* Empty — no filters but still show Search button */}
+      {/* No filters — still show action button */}
       {!isLoading && !errorMsg && filters.length === 0 && onSearch && (
         <div className="filter-panel-controls">
-          <div className="filter-control filter-search-wrap">
-            <span className="filter-control-label">&nbsp;</span>
-            <button
-              className="filter-search-btn"
-              onClick={handleSearchClick}
-              disabled={isSearching}
-              title="Search"
-            >
-              {isSearching ? (
-                <>
-                  <div className="filter-search-spinner" />
-                  <span>Searching...</span>
-                </>
-              ) : (
-                <>
-                  <Search size={14} strokeWidth={2.5} />
-                  <span>Search</span>
-                </>
-              )}
-            </button>
-          </div>
+          {ActionButton}
         </div>
       )}
     </div>

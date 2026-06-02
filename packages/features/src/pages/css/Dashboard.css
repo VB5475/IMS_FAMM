@@ -1,0 +1,452 @@
+/* Dashboard.css — uses tokens from App.css :root */
+
+/* ─── Page Shell ──────────────────────────────────────────────────────── */
+.dashboard-container {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Header Panel ────────────────────────────────────────────────────── */
+.dashboard-header-panel {
+  background: var(--header-gradient);
+  color: #fff;
+  padding: 18px 28px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(30,61,122,0.25);
+}
+
+.dashboard-header-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+}
+
+.dashboard-header-panel h1 {
+  margin: 0 0 2px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  color: #ffffff;
+}
+
+.dashboard-header-panel p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.75);
+  font-weight: 400;
+}
+
+/* ─── Main Grid ───────────────────────────────────────────────────────── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 20px;
+  padding: 20px;
+  flex: 1;
+  align-items: start;
+}
+
+.dashboard-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ─── ERP Card shell ──────────────────────────────────────────────────── */
+.erp-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.erp-card-header {
+  padding: 12px 16px;
+  background: var(--header-gradient);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.erp-card-header::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+}
+
+.erp-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.erp-card-title svg {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+.erp-card-content {
+  padding: 0;           /* let inner components control padding */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Report List ─────────────────────────────────────────────────────── */
+
+/* The card itself stretches to fill the left column */
+.left-col .erp-card {
+  flex: 1;
+}
+
+/* Fixed height = exactly 10 rows (48px each) + sticky header row (44px).
+   Content beyond 10 rows scrolls internally.                              */
+.report-table-container {
+  overflow: auto;
+  height: calc(10 * 48px + 44px); /* 480px rows + 44px header = 524px */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-dark) transparent;
+}
+
+.report-table-container::-webkit-scrollbar { height: 8px; width: 8px; }
+.report-table-container::-webkit-scrollbar-track { background: transparent; }
+.report-table-container::-webkit-scrollbar-thumb {
+  background: var(--border-dark);
+  border-radius: 4px;
+}
+
+/* ── Table ── */
+.erp-table.report-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.84rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  table-layout: fixed;   /* fixed layout = word-wrap works */
+}
+
+/* ── Column widths — prevents word-wrap chaos ── */
+.erp-table.report-table col.col-board    { width: 36%; }
+.erp-table.report-table col.col-overdue  { width: 14%; }
+.erp-table.report-table col.col-short    { width: 14%; }
+.erp-table.report-table col.col-long     { width: 14%; }
+.erp-table.report-table col.col-team     { width: 22%; }
+
+.erp-table.report-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 50%, #dbeafe 100%);
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid #94a3b8;
+  border-right: 1px solid var(--border-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;           /* headers stay on one line */
+  user-select: none;
+  vertical-align: middle;
+}
+
+.erp-table.report-table thead th:last-child { border-right: none; }
+
+/* Filter selects inside th */
+.header-filter-select {
+  margin-left: 6px;
+  padding: 2px 22px 2px 6px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  appearance: none;
+  background-image: var(--chevron-svg);
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  cursor: pointer;
+  transition: border-color var(--transition);
+  vertical-align: middle;
+  max-width: 110px;
+}
+
+.header-filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* ── Body cells ── */
+.erp-table.report-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.83rem;
+  color: #334155;
+  font-weight: 400;
+  vertical-align: middle;
+  /* word-wrap for the Report Board column */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.erp-table.report-table tbody td:last-child { border-right: none; }
+
+/* Non-first columns: keep on one line */
+.erp-table.report-table tbody td:not(:first-child) {
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Zebra */
+.erp-table.report-table tbody tr:nth-child(even) td { background: #f8fafc; }
+
+/* Hover */
+.erp-table.report-table tbody tr:hover td { background: var(--primary-lighter); }
+
+/* Report Board link */
+.report-link {
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color var(--transition);
+  display: block;             /* fills the cell so whole text is clickable */
+  word-break: break-word;
+}
+
+.report-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* ── Badges ── */
+.erp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.erp-badge.danger  { background: #fee2e2; color: #b91c1c; }
+.erp-badge.warning { background: #fef3c7; color: #92400e; }
+.erp-badge.success { background: #d1fae5; color: #065f46; }
+.erp-badge.neutral { background: #f1f5f9; color: var(--text-muted); }
+
+/* ── Pagination bar (bottom gradient strip) ── */
+.erp-bottom-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--header-gradient);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.erp-pagination-info {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.85);
+  font-weight: 500;
+}
+
+.erp-pagination-info span { font-weight: 700; color: #ffffff; }
+
+.erp-pagination-controls { display: flex; gap: 6px; }
+
+.erp-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  backdrop-filter: blur(4px);
+}
+
+.erp-page-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+
+.erp-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ─── Task Board ──────────────────────────────────────────────────────── */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+
+.task-card:hover {
+  border-color: #93c5fd;
+  background: var(--primary-lighter);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.task-card-main h4 {
+  margin: 0 0 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.task-card-main p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.task-status {
+  flex-shrink: 0;
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+}
+
+/* ─── Decision Insights ───────────────────────────────────────────────── */
+.decision-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.decision-alert {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition);
+}
+
+.decision-alert:hover { box-shadow: var(--shadow-md); }
+
+.decision-alert h4 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.decision-alert p {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.decision-alert.primary {
+  border-left: 4px solid var(--primary);
+  background: var(--primary-lighter);
+}
+
+.decision-alert.primary h4 { color: var(--primary-hover); }
+
+.decision-alert.success {
+  border-left: 4px solid var(--success);
+  background: #f0fdf4;
+}
+
+.decision-alert.success h4 { color: #065f46; }
+
+/* Action button — orange CTA matching toolbar-btn.primary */
+.erp-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: linear-gradient(180deg, var(--orange) 0%, var(--orange-hover) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 2px 8px rgba(232,114,42,0.3);
+}
+
+.erp-action-btn:hover {
+  background: linear-gradient(180deg, #f0803a 0%, var(--orange) 100%);
+  box-shadow: 0 4px 14px rgba(232,114,42,0.4);
+  transform: translateY(-1px);
+}
+
+.erp-action-btn:active { transform: translateY(0); }
+
+/* ─── Shared spinner ──────────────────────────────────────────────────── */
+.app-searching-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .dashboard-header-panel { padding: 14px 16px; }
+  .dashboard-grid { padding: 12px; gap: 12px; }
+  .erp-bottom-panel { flex-direction: column; align-items: flex-start; }
+}
